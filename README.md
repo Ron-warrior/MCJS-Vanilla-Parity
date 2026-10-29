@@ -1,7 +1,7 @@
 # MCJS-Vanilla-Parity
 Fork of https://github.com/Reb0rnEnder/MinecraftJS that attempts to eventually have full parity with vanilla mc.
 
-# MinecraftJS v1.1.0 (Minecraft 1.15.2)
+# MinecraftJS v1.2.0 (Minecraft 1.15.2)
 
 The full 1.15.2 game in a single HTML file: singleplayer survival,
 villages, Nether and End, villager trading, crafting, tab co-op Realms,
@@ -10,7 +10,7 @@ open the file and play.
 
 ## Get it
 
-**`minecraftjs.1.15.2._v1.1.0.html`** (~150 MB). Open it in Chrome or
+**`minecraftjs.1.15.2._v1.2.0.html`** (~150 MB). Open it in Chrome or
 Firefox (works from `file://`; Safari may not persist saves) and hit
 **Singleplayer**. Saves live in the browser's localStorage; installed
 resource packs use IndexedDB. No service worker needed.
@@ -89,7 +89,10 @@ bows, fishing, boats, minecarts + rails, horses, full farming, weather +
 lightning, splash/lingering/drinkable potions, 26 spawn eggs, cake slices,
 bed sleep/skip. Enchanting table: bookshelf-scaled costs,
 lapis + XP levels, weighted random enchantments (JE rules, no
-treasure/curses), books become enchanted books.
+treasure/curses), books become enchanted books. Anvil: repair with the
+item's material, combine two items (durability + merged enchantments, JE
+costs with prior-work penalties and the 40-level "Too expensive!" cap),
+and renaming; anvils wear out and break with use.
 
 ## Villager trading (JE 1.15.2 rules)
 
