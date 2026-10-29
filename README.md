@@ -1,14 +1,20 @@
 # MCJS-Vanilla-Parity
 Fork of https://github.com/Reb0rnEnder/MinecraftJS that attempts to eventually have full parity with vanilla mc.
-# MinecraftJS v1.0.0 — complete feature list
 
-This describes **`minecraftjs.1.15.2._v1.0.0.html** — the single-file build which is the released/shared
-artifact (~150 MB, needs no install and no account). Everything
-below ships inside that one file unless marked otherwise.
-Version tags: each section header names the release that added it
-(`added vX`); individual entries gain `modified vX` / `fixed vX` tags when
-a later release changes or fixes them. See `CHANGELOG.md` for the
-release-by-release history.
+# MinecraftJS v1.0.0 — offline build (Minecraft 1.15.2)
+
+The full 1.15.2 game in a single HTML file: singleplayer survival,
+villages, Nether and End, villager trading, crafting, tab co-op Realms,
+touch controls, Skyblock, and resource packs. No install, no account —
+open the file and play.
+
+## Get it
+
+**`minecraftjs.1.15.2._v1.0.0.html`** (~150 MB) — built from the title
+screen's "Offline copy" button. Open it in Chrome or Firefox (works from
+`file://`; Safari may not persist saves) and hit **Singleplayer**. Saves
+live in the browser's localStorage; installed resource packs use
+IndexedDB. No service worker needed.
 
 - **Fully offline** (no internet at all): the whole game below up to Realms.
 - **Needs internet**: joining external multiplayer servers, server-list
@@ -18,9 +24,10 @@ release-by-release history.
   stacks aren't in the file), dev sources (`src/tools/`,
   `src/eagler-bridge/`, `src/mc1132/`).
 
-Saves live in the browser's localStorage (works on `file://` in
-Chrome/Firefox; Safari may not persist them). IndexedDB holds installed
-resource packs. No service worker needed.
+Release history: `CHANGELOG.md` (each entry is that release's
+description). Version tags: each section header names the release that
+added it (`added vX`); individual entries gain `modified vX` / `fixed vX`
+tags when a later release changes or fixes them.
 
 ## Starting it *(added v1.0.0)*
 
@@ -140,3 +147,4 @@ Eagler interop, and `?voicebridge=` boots nothing useful.
 ## Parked (not in any build yet) *(added v1.0.0)*
 
 Mod loader.
+
