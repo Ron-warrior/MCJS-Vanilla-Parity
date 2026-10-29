@@ -10,8 +10,7 @@ open the file and play.
 
 ## Get it
 
-**`minecraftjs.1.15.2._v1.0.0.html`** (~150 MB) — built from the title
-screen's "Offline copy" button. Open it in Chrome or Firefox (works from
+**`minecraftjs.1.15.2._v1.0.0.html`** (~150 MB) — Open it in Chrome or Firefox (works from
 `file://`; Safari may not persist saves) and hit **Singleplayer**. Saves
 live in the browser's localStorage; installed resource packs use
 IndexedDB. No service worker needed.
