@@ -1,7 +1,7 @@
 # MCJS-Vanilla-Parity
 Fork of https://github.com/Reb0rnEnder/MinecraftJS that attempts to eventually have full parity with vanilla mc.
 
-# MinecraftJS v1.0.0 — offline build (Minecraft 1.15.2)
+# MinecraftJS v1.1.0 (Minecraft 1.15.2)
 
 The full 1.15.2 game in a single HTML file: singleplayer survival,
 villages, Nether and End, villager trading, crafting, tab co-op Realms,
@@ -10,37 +10,28 @@ open the file and play.
 
 ## Get it
 
-**`minecraftjs.1.15.2._v1.0.0.html`** (~150 MB) — Open it in Chrome or Firefox (works from
-`file://`; Safari may not persist saves) and hit **Singleplayer**. Saves
-live in the browser's localStorage; installed resource packs use
-IndexedDB. No service worker needed.
+**`minecraftjs.1.15.2._v1.1.0.html`** (~150 MB). Open it in Chrome or
+Firefox (works from `file://`; Safari may not persist saves) and hit
+**Singleplayer**. Saves live in the browser's localStorage; installed
+resource packs use IndexedDB. No service worker needed.
 
-- **Fully offline** (no internet at all): the whole game below up to Realms.
+- **No internet needed**: the whole game below up to Realms.
 - **Needs internet**: joining external multiplayer servers, server-list
   pings, cross-device Realms mesh.
-- **Not in the file**: voice chat (disabled in code — see Voice),
-  dead query params (`?engine=1132`, `?voicebridge=` — boot nothing, those
-  stacks aren't in the file), dev sources (`src/tools/`,
-  `src/eagler-bridge/`, `src/mc1132/`).
+- **Not in this build**: voice chat (see Voice).
 
-Release history: `CHANGELOG.md` (each entry is that release's
-description). Version tags: each section header names the release that
-added it (`added vX`); individual entries gain `modified vX` / `fixed vX`
-tags when a later release changes or fixes them.
-
-## Starting it *(added v1.0.0)*
+## Starting it
 
 Open the file → title screen (Mojang splash → authentic 1.15 "Buzzy Bees"
 panorama): **Singleplayer**, **Multiplayer**, **Minecraft Realms**,
-**Offline copy** info, Options (incl. accessibility, language, resource
+**Download** info, Options (incl. accessibility, language, resource
 packs, shaders), Quit-to-title. Native engine-rendered dialogs throughout:
 confirm/prompt/keyboard widgets, native death screen ("You died!" +
 Respawn, Enter respawns), loading veils, status toasts. URL extras that
 work in the file: `?connect=<server>`, `?touch=1/0`, `#realm=<code>`
-invite links (open the Realms menu). (`?engine=1132` and `?voicebridge=`
-do nothing offline — those stacks aren't in the file.)
+invite links (open the Realms menu).
 
-## The client (vendored 1.15.2 engine, in the file) *(added v1.0.0)*
+## The client (1.15.2 engine, in the file)
 
 Full 1.15.2 client: chunk rendering (WebGL2/WebGPU/CPU fallback), entity
 models, particles, sky/weather visuals, day/night, HUD (hearts, hunger,
@@ -51,19 +42,19 @@ credits. Ships native 1.15.2 registries + assets inside the file (680
 blocks / 11,337 states / 884 items / 768 recipes / 103 entity types, real
 1.15 textures, models, sounds, languages).
 
-## Singleplayer (fully offline) *(added v1.0.0)*
+## Singleplayer
 
 Engine-rendered world menu: list with **thumbnail screenshots**, search,
 Play/Create/Delete/Rename; Enter or double-click plays. Create form: name,
 seed, 5 world types — **Terralith** (default), Classic hills, Superflat,
 Void, Skyblock — gamemode, difficulty, structures toggle, cheats toggle,
 **bonus-chest** toggle. Seeded deterministic terrain (only your edits are
-saved); autosaves while playing; old 1.13.2 saves migrate on load. Offline
-chat commands: `/time /gamemode /tp /spawn /give /difficulty
+saved); autosaves while playing; old 1.13.2 saves migrate on load. Chat
+commands: `/time /gamemode /tp /spawn /give /difficulty
 (peaceful|easy|hard) /weather`. Void rescue, creative placement fixes,
 starter chest on bonus worlds.
 
-## World generation (all in-file, all offline) *(added v1.0.0)*
+## World generation (all in-file)
 
 - **Villages** (Classic hills): deterministic lattice — plank houses (log
   corners, glass, doors, torches), cobble well, wheat farms, fence lamps,
@@ -82,7 +73,7 @@ starter chest on bonus worlds.
   toward it; eye-into-frame lighting; two-way portal travel; endermen-only
   spawns; per-dimension saves.
 
-## Survival simulation (10 Hz, fully offline) *(added v1.0.0)*
+## Survival simulation (10 Hz)
 
 Health/hunger/exhaustion, difficulty scaling, fall/drown/lava/fire/void
 damage, armor + toughness, weapon skills (cooldown/crit/sweep/shields/
@@ -96,9 +87,11 @@ bar, 40/10 spawn director with day/night + light rules. Blocks: TNT,
 buckets, furnaces (smelting + banked XP), chests, workbench, throwables,
 bows, fishing, boats, minecarts + rails, horses, full farming, weather +
 lightning, splash/lingering/drinkable potions, 26 spawn eggs, cake slices,
-bed sleep/skip.
+bed sleep/skip. Enchanting table: bookshelf-scaled costs,
+lapis + XP levels, weighted random enchantments (JE rules, no
+treasure/curses), books become enchanted books.
 
-## Villager trading (JE 1.15.2 rules, fully offline) *(added v1.0.0)*
+## Villager trading (JE 1.15.2 rules)
 
 13 employed professions + nitwit/unemployed (headshake, no window); up to 5
 residents + 1 golem per village with home tethers. Full JE 1.15.2 trade
@@ -109,14 +102,14 @@ input salvage, per-village persistence. Special rolls: librarian books,
 enchanted gear (no treasure/curses), tipped arrows, suspicious stew, dyed
 leather armor, color families; explorer maps withheld.
 
-## Crafting (fully offline) *(added v1.0.0)*
+## Crafting
 
 Recipe book fed from the in-file registry (browsable, craftable-
 highlighting, ghost-click **click-to-craft**, shift-click crafts all);
 bucket container returns; workbench close spills grid + cursor back;
 vanilla tool repair.
 
-## Realms co-op (same-machine tabs; cross-device needs internet) *(added v1.0.0)*
+## Realms co-op (same-machine tabs; cross-device needs internet)
 
 Rooms run **between tabs on the same computer** (BroadcastChannel + localStorage, no setup) with the same
 protocol: room codes, creative/survival, avatars, block-edit relay + log
@@ -125,13 +118,11 @@ internet, an optional mesh mode (Trystero over public Nostr relays, tick
 the box in the Realms menu) finds other devices running the same file.
 Rooms last only while the tabs are open.
 
-## Voice (not present) *(added v1.0.0)*
+## Voice (not present)
 
-No voice chat in this build: the voice hooks are hard-disabled in code
-(`externalServer()` returns null): no voice menu, no voice rooms, no
-Eagler interop, and `?voicebridge=` boots nothing useful.
+No voice chat in this build: no voice menu, no voice rooms.
 
-## Everything else (all in-file, offline) *(added v1.0.0)*
+## Everything else (all in-file)
 
 - **Touch controls**: joystick + drag-look + buttons, hotbar tap-select,
   `?touch=` force flags.
@@ -143,7 +134,6 @@ Eagler interop, and `?voicebridge=` boots nothing useful.
 - **Multiplayer tab**: join external servers + server pings work from the
   file whenever the device itself is online (fully self-contained file).
 
-## Parked (not in any build yet) *(added v1.0.0)*
+## Parked (not in any build yet)
 
 Mod loader.
-
