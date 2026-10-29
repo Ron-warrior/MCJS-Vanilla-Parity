@@ -2,8 +2,7 @@
 Fork of https://github.com/Reb0rnEnder/MinecraftJS that attempts to eventually have full parity with vanilla mc.
 # MinecraftJS v1.0.0 — complete feature list
 
-This describes **`minecraftjs.1.15.2._v1.0.0.html** — the single-file build from
-the title screen's "Offline copy" button, which is the released/shared
+This describes **`minecraftjs.1.15.2._v1.0.0.html** — the single-file build which is the released/shared
 artifact (~150 MB, needs no install and no account). Everything
 below ships inside that one file unless marked otherwise.
 Version tags: each section header names the release that added it
