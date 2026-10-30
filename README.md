@@ -1,7 +1,7 @@
 # MCJS-Vanilla-Parity
 Fork of https://github.com/Reb0rnEnder/MinecraftJS that attempts to eventually have full parity with vanilla mc.
 
-# MinecraftJS v1.5.0 (Minecraft 1.15.2)
+# MinecraftJS vx.x.x (Minecraft 1.15.2)
 
 The full 1.15.2 game in a single HTML file: singleplayer survival,
 villages, Nether and End, villager trading, crafting, tab co-op Realms,
@@ -10,7 +10,7 @@ open the file and play.
 
 ## Get it
 
-**`minecraftjs.1.15.2._v1.5.0.html`** (~150 MB). Open it in Chrome or
+**`minecraftjs.1.15.2._vx.x.x.html`** (~150 MB). Open it in Chrome or
 Firefox (works from `file://`; Safari may not persist saves) and hit
 **Singleplayer**. Saves live in the browser's localStorage; installed
 resource packs use IndexedDB. No service worker needed.
