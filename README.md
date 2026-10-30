@@ -79,7 +79,7 @@ Health/hunger/exhaustion, difficulty scaling, fall/drown/lava/fire/void
 damage, armor + toughness, weapon skills (cooldown/crit/sweep/shields/
 totem), milk, full status-effect engine (poison/regeneration/fire
 resistance/night vision/chorus teleport/suspicious-stew flower effects…).
-**27 mob species** with wiki-checked AI (creeper fuses, skeleton archers,
+**28 mob species** with wiki-checked AI (creeper fuses, skeleton archers,
 enderman stare, slime splitting, witch potions, phantoms…), taming
 (wolves, cats, parrots, horses…), breeding + babies, pets that follow and
 fight for you, golem building, magnet drops, XP orbs driving the native XP
@@ -104,6 +104,84 @@ durability merge (+5%) or strip-to-curses with XP from removed
 enchantments (books come back plain). Stonecutter: 1-block-in,
 variant-out cutting list (slabs ×2). Composter: feed plants to fill
 layers, harvest bone meal when full. Bell: rings and startles villagers.
+Hopper: aims at the clicked face on placement, then pushes/pulls/sucks
+one item per 4 masterTicks, stopping while powered (the enabled bit
+mirrors the lock). Dispenser + dropper: face the placer and fire on
+power edges after a 2-tick delay — arrows/snowballs/eggs/pearls/potions/
+fire charges shoot straight and neutral (no player credit or anger),
+buckets place and collect source blocks, flint & steel ignites and
+primes TNT, TNT primes, bone meal grows crops, boats land on water;
+droppers push into the faced container or eject otherwise. Switches:
+levers, stone buttons (10-tick release) and wood buttons (15-tick)
+mount on any block face, including hopper tops; daylight detectors
+follow the sun curve and pressure plates read mobs + player. Power is a
+full 0-15 signal sim: redstone dust carries up to 15 blocks with side/up
+connection rendering, climbs steps, and pops (dropping redstone) without
+a solid floor; torches invert with a 2-tick delay and burn out after 8
+fast toggles (revived by the next change a minute later); repeaters
+delay 1-4 ticks, lock from either side, never pass signal backward, and
+step delay on right-click; comparators read the container behind them
+(or the signal there) in compare/subtract modes, switching on
+right-click; daylight detectors mirror their computed level into the
+net. Dust, torches, repeaters and comparators place oriented. Pistons
+and observers complete the set: both face the placer, pistons push up
+to 12 blocks (sticky ones pull back) and refuse tile entities, arms
+render through the slide, slime and honey carry their side blocks
+(slimes and honey don't stick to each other), and fragile blocks in
+the way pop as drops. Power edges fire after a 1-tick delay and drop
+out if power leaves first; weak power in the cell above the base
+counts too (quasi-connectivity), pushes shove mobs and items along,
+and saves that land mid-slide repair themselves on entry. Observers
+pulse 2 ticks on any neighbor change and output only out the back —
+two face-to-face clock each other. Hoppers, dispensers, rails, lamps,
+TNT and note blocks all answer to dust, and everything persists
+across reloads. Mobs animate instead of sliding: walk/idle limb
+swings through the engine interpolator (children swing 3x),
+grounded/airborne wing and leg poses, sitting wolves (empty-hand
+right-click toggles — sitters hold and skip bodyguard/teleport),
+sheep grazing while the coat regrows, angry wolves/endermen/bees,
+enderman scream, skeleton bow-aim with bows rendered, melee/ranged
+attack swings, witch drink/throw tells, creeper swell with charged
+flash, bee banking roll, horse rear/graze/nibble/tail-swish with
+saddle and rider flags — plus hurt flash and a fall-over death
+animation (bodies linger ~1s, then poof). Purely visual: no AI or
+hitbox changes. Still out: doors/trapdoors/fence gates (no door sim
+yet). All tiles run with the UI
+closed, persist across reloads with cooldown/power state, and spill
+their contents when broken. Dispensers also shear sheep (correct coat
+color, wear not consume), saddle and armor horses, dress the player
+standing in front (empty slots only — occupied slots refuse), and place
+shulker boxes that open as 27-slot tiles. Wooden pressure plates hear
+dropped items and arrows (stone stays mobs + player), and daylight
+detectors follow real sky exposure — roofs shade them to zero — with
+rain and thunder dulling the signal. Dispensers place skulls as floor
+blocks and pumpkins facing the ejection direction (pumpkins complete
+snow and iron golems through the dispenser), dress zombies, husks,
+skeletons and strays in armor (empty slots only — gear protects and
+drops on death), and raise the wither from a soul-sand T topped with 3
+wither skulls, by hand or dispenser alike. The wither hovers, lobs
+bursting skulls that inflict Wither, and hits hard up close. Armor
+stands place from the armor_stand item onto a solid top face, dress by
+hand (swap — the old piece pops back to you, skulls and pumpkins go on
+the head, elytra on the chest) or by dispenser (empty slots only),
+take anvil-renamed name tags, break in one punch dropping the stand
+plus its gear, fall with gravity, and persist per world with gear and
+names. Daylight detectors toggle inverted mode on right-click, and
+leather horse armor finally fits the tack window. Bees forage flowers,
+fill nectar, pollinate crops (+1 stage, 10 blooms a trip) and ferry
+honey home to beehives or bee nests (crafted hives face the placer;
+wild nests seed on oak/birch trunks), raising honey to 5. Harvest
+honeycomb with shears or fill glass bottles at full hives — a lit
+campfire within 5 below smokes them calm, otherwise the swarm stings
+back with poison (one sting per bee, then it dies within a minute),
+and bottled honey cures poison. Silk touch carries the colony inside
+the block (placing it re-homes the bees); plain breaks release
+everyone and anger the swarm, nests dropping nothing and hives
+dropping themselves empty. Campfires light with flint and steel, burn
+mobs standing in them, go out to shovels and water, and calm through
+up to one solid block; dispensers harvest full hives and light
+campfires too. Breed bees with flowers; night and rain send them home
+to shelter.
 
 ## Villager trading (JE 1.15.2 rules)
 
