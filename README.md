@@ -1,7 +1,7 @@
 # MCJS-Vanilla-Parity
 Fork of https://github.com/Reb0rnEnder/MinecraftJS that attempts to eventually have full parity with vanilla mc.
 
-# MinecraftJS v1.2.0 (Minecraft 1.15.2)
+# MinecraftJS v1.5.0 (Minecraft 1.15.2)
 
 The full 1.15.2 game in a single HTML file: singleplayer survival,
 villages, Nether and End, villager trading, crafting, tab co-op Realms,
@@ -10,7 +10,7 @@ open the file and play.
 
 ## Get it
 
-**`minecraftjs.1.15.2._v1.2.0.html`** (~150 MB). Open it in Chrome or
+**`minecraftjs.1.15.2._v1.5.0.html`** (~150 MB). Open it in Chrome or
 Firefox (works from `file://`; Safari may not persist saves) and hit
 **Singleplayer**. Saves live in the browser's localStorage; installed
 resource packs use IndexedDB. No service worker needed.
@@ -24,7 +24,7 @@ resource packs use IndexedDB. No service worker needed.
 
 Open the file → title screen (Mojang splash → authentic 1.15 "Buzzy Bees"
 panorama): **Singleplayer**, **Multiplayer**, **Minecraft Realms**,
-**Download** info, Options (incl. accessibility, language, resource
+Options (incl. accessibility, language, resource
 packs, shaders), Quit-to-title. Native engine-rendered dialogs throughout:
 confirm/prompt/keyboard widgets, native death screen ("You died!" +
 Respawn, Enter respawns), loading veils, status toasts. URL extras that
@@ -92,7 +92,18 @@ lapis + XP levels, weighted random enchantments (JE rules, no
 treasure/curses), books become enchanted books. Anvil: repair with the
 item's material, combine two items (durability + merged enchantments, JE
 costs with prior-work penalties and the 40-level "Too expensive!" cap),
-and renaming; anvils wear out and break with use.
+and renaming; anvils wear out and break with use. Brewing stand: fill
+glass bottles from water, then brew the full JE table (extended and
+level-II variants, corruptions, splash and lingering) with blaze-powder
+fuel; batches keep going with the UI closed and persist across reloads.
+Nether wart rides the stronghold chest until fortresses grow it
+(dragon's breath has no source until the dragon). Blast furnace + smoker:
+2×-speed smelting (ores/tools/armor vs. food only) with 2× fuel burn, lit
+states, banked XP. Barrel: 27-slot silent storage. Grindstone: two-item
+durability merge (+5%) or strip-to-curses with XP from removed
+enchantments (books come back plain). Stonecutter: 1-block-in,
+variant-out cutting list (slabs ×2). Composter: feed plants to fill
+layers, harvest bone meal when full. Bell: rings and startles villagers.
 
 ## Villager trading (JE 1.15.2 rules)
 
