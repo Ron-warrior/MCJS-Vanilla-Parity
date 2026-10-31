@@ -1,28 +1,31 @@
 # MCJS-Vanilla-Parity
 Fork of https://github.com/Reb0rnEnder/MinecraftJS that attempts to eventually have full parity with vanilla mc.
 
-# MinecraftJS vx.x.x (Minecraft 1.15.2)
+# MinecraftJS v1.14.0 (Minecraft 1.18.2)
 
-The full 1.15.2 game in a single HTML file: singleplayer survival,
-villages, Nether and End, villager trading, crafting, tab co-op Realms,
-touch controls, Skyblock, and resource packs. No install, no account —
-open the file and play.
+The full 1.18.2 game in a single HTML file: singleplayer survival on a
+−64..319 deep world, villages under illager threat (patrols, raids, the
+wandering trader), Nether and End, villager trading, crafting, tab co-op
+Realms, touch controls, Skyblock, and resource packs. No install, no
+account — open the file and play.
 
 ## Get it
 
-**`minecraftjs.1.15.2._vx.x.x.html`** (~150 MB). Open it in Chrome or
+**`minecraftjs.1.18.2._v1.14.0.html`** (~175 MB). Open it in Chrome or
 Firefox (works from `file://`; Safari may not persist saves) and hit
 **Singleplayer**. Saves live in the browser's localStorage; installed
 resource packs use IndexedDB. No service worker needed.
 
-- **No internet needed**: the whole game below up to Realms.
+- **No internet needed**: the whole game below up to Realms — except the
+  23 long music/ambience tracks, which stream on demand when online (everything
+  else, including all sound effects, plays offline).
 - **Needs internet**: joining external multiplayer servers, server-list
   pings, cross-device Realms mesh.
 - **Not in this build**: voice chat (see Voice).
 
 ## Starting it
 
-Open the file → title screen (Mojang splash → authentic 1.15 "Buzzy Bees"
+Open the file → title screen (Mojang splash → 1.18 "Caves & Cliffs"
 panorama): **Singleplayer**, **Multiplayer**, **Minecraft Realms**,
 Options (incl. accessibility, language, resource
 packs, shaders), Quit-to-title. Native engine-rendered dialogs throughout:
@@ -31,38 +34,53 @@ Respawn, Enter respawns), loading veils, status toasts. URL extras that
 work in the file: `?connect=<server>`, `?touch=1/0`, `#realm=<code>`
 invite links (open the Realms menu).
 
-## The client (1.15.2 engine, in the file)
+## The client (1.18.2 engine, in the file)
 
-Full 1.15.2 client: chunk rendering (WebGL2/WebGPU/CPU fallback), entity
+Full 1.18.2 client: chunk rendering (WebGL2/WebGPU/CPU fallback), entity
 models, particles, sky/weather visuals, day/night, HUD (hearts, hunger,
 armor, XP bar, hotbar, crosshair, boss bars), inventory + container
 screens, chat, pause/death/options/pack/shader/stats/advancements/book/
 sign/command-block/structure screens, narrator, spectator, demo mode,
-credits. Ships native 1.15.2 registries + assets inside the file (680
-blocks / 11,337 states / 884 items / 768 recipes / 103 entity types, real
-1.15 textures, models, sounds, languages).
+credits. Ships native 1.18.2 registries + assets inside the file (898
+blocks / 20,342 states / 1,100 items / 511 recipes / 113 entity types,
+real 1.18 textures, models, sounds, languages). The Overworld spans Y
+−64 (bedrock) to the 319 build limit; the Nether keeps its 0..127
+floor/ceiling and the End 0..255, matching vanilla dimensions.
+Multiplayer joins 1.18.2 servers over protocol 758. Audio: full 1.18.2
+sound set (1,203 events) — effects decode in-file while the 23 long
+tracks (new menu/game/nether music, otherside + pigstep discs, nether
+ambience) stream on demand; the Nether gets its wastes music pool and
+ambient bed plus additions/mood one-shots, and all 14 disc events
+(including otherside + pigstep) resolve to audio.
 
 ## Singleplayer
 
 Engine-rendered world menu: list with **thumbnail screenshots**, search,
 Play/Create/Delete/Rename; Enter or double-click plays. Create form: name,
-seed, 5 world types — **Terralith** (default), Classic hills, Superflat,
+seed, 6 world types — **Terralith** (default), Classic hills, **Tectonic**, Superflat,
 Void, Skyblock — gamemode, difficulty, structures toggle, cheats toggle,
 **bonus-chest** toggle. Seeded deterministic terrain (only your edits are
-saved); autosaves while playing; old 1.13.2 saves migrate on load. Chat
+saved); autosaves while playing. The Overworld spans Y −64 (bedrock) to
+the 319 build limit; deep edits save and reload like any other. Chat
 commands: `/time /gamemode /tp /spawn /give /difficulty
 (peaceful|easy|hard) /weather`. Void rescue, creative placement fixes,
 starter chest on bonus worlds.
 
 ## World generation (all in-file)
 
+- **Tectonic** (Tectonic world type): genuine 1.18.2 density-function
+  terrain (Tectonic v2.2.2 router over jar-verified 1.18.2 noise) — wide
+  oceans, eroded peaks past Y 200, climate-mapped biomes with trees, ores
+  and dressing. Villages/strongholds stay on Classic hills for now; cave
+  carving comes later (solid fill below the surface for now).
 - **Villages** (Classic hills): deterministic lattice — plank houses (log
   corners, glass, doors, torches), cobble well, wheat farms, fence lamps,
   gravel paths.
-- **9 biomes**: plains, desert (cactus/dead bush), jungle, swamp, ocean,
+- **9 biomes** (Classic hills; Tectonic adds a treeless **meadow** above
+  the tree line): plains, desert (cactus/dead bush), jungle, swamp, ocean,
   river, beach, snow, rock — matching surfaces, trees, dressing, and
   biome-gated mob spawns (jungle parrots, swamp slimes, snow polar bears,
-  desert husks).
+  desert husks, meadow goats).
 - **Nether**: bedrock floor + ceiling, netherrack, lava seas, soul sand,
   gravel, quartz ore, glowstone; 4×5 obsidian **portals** light with fire,
   **8:1 travel** both ways with return portals; beds explode, water
@@ -72,6 +90,13 @@ starter chest on bonus worlds.
   with prefilled eyes + loot chest); throwable **eyes of ender** that fly
   toward it; eye-into-frame lighting; two-way portal travel; endermen-only
   spawns; per-dimension saves.
+- **1.18 ores**: depth-banded triangle distributions (diamond peaks at the
+  floor, redstone/lapis/gold/copper/iron/coal/emerald each with their own
+  band), stone→deepslate blend across Y 0..−8 with rare tuff, deepslate
+  ore variants, smelting + XP parity.
+- **Woodland mansion** (Tectonic): cobble hall with glass rhythm, dark-oak
+  trim, log pillars, floor torches and a diamond sanctum; deterministic
+  residents, sanctum loot chest, and L4 cartographer explorer maps.
 
 ## Survival simulation (10 Hz)
 
@@ -79,14 +104,14 @@ Health/hunger/exhaustion, difficulty scaling, fall/drown/lava/fire/void
 damage, armor + toughness, weapon skills (cooldown/crit/sweep/shields/
 totem), milk, full status-effect engine (poison/regeneration/fire
 resistance/night vision/chorus teleport/suspicious-stew flower effects…).
-**28 mob species** with wiki-checked AI (creeper fuses, skeleton archers,
+**31 mob species** with wiki-checked AI (creeper fuses, skeleton archers,
 enderman stare, slime splitting, witch potions, phantoms…), taming
 (wolves, cats, parrots, horses…), breeding + babies, pets that follow and
 fight for you, golem building, magnet drops, XP orbs driving the native XP
 bar, 40/10 spawn director with day/night + light rules. Blocks: TNT,
 buckets, furnaces (smelting + banked XP), chests, workbench, throwables,
 bows, fishing, boats, minecarts + rails, horses, full farming, weather +
-lightning, splash/lingering/drinkable potions, 26 spawn eggs, cake slices,
+lightning, splash/lingering/drinkable potions, 29 spawn eggs, cake slices,
 bed sleep/skip. Enchanting table: bookshelf-scaled costs,
 lapis + XP levels, weighted random enchantments (JE rules, no
 treasure/curses), books become enchanted books. Anvil: repair with the
@@ -183,6 +208,20 @@ up to one solid block; dispensers harvest full hives and light
 campfires too. Breed bees with flowers; night and rain send them home
 to shelter.
 
+## Illagers, raids and the wandering trader
+
+Pillagers, vindicators, evokers (+ vexes) and ravagers with wiki-checked
+AI: they hunt players, villagers, traders and golems. Patrols roam day
+or night behind a banner-wearing captain — kill the captain for Bad
+Omen, then enter a village to trigger a multi-wave raid (victory earns
+Hero of the Village). The wandering trader wanders in on his own with
+llamas and a trade list; leads clip onto leashable mobs and tie to
+fence posts as knots that persist across reloads. Naming a vindicator
+"Johnny" with a name tag does what you'd expect. Woodland mansions generate
+on Tectonic terrain with deterministic residents (an evoker plus four
+vindicators, vex summons, totem and emerald drops), a lootable sanctum
+chest, and cartographer explorer maps that survey the mansion.
+
 ## Villager trading (JE 1.15.2 rules)
 
 13 employed professions + nitwit/unemployed (headshake, no window); up to 5
@@ -192,7 +231,8 @@ demand + reputation pricing, max-uses lockout, **2×/day restock**, +rep per
 trade, hit → −rep + window close + golem retaliation, 8-block range close,
 input salvage, per-village persistence. Special rolls: librarian books,
 enchanted gear (no treasure/curses), tipped arrows, suspicious stew, dyed
-leather armor, color families; explorer maps withheld.
+leather armor, color families; expert cartographers sell a Woodland
+Explorer Map (13 emeralds + compass) with a pre-rendered mansion survey.
 
 ## Crafting
 
