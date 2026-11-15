@@ -1,0 +1,80 @@
+name: Import 1.19.4 source
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [1.19.4]
+    paths:
+      - '.github/workflows/import-source.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 1.19.4
+          fetch-depth: 0
+
+      - name: Skip when the source is already here
+        id: check
+        run: |
+          if [ -f src/boot.js ] && [ -d src/mc1194 ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "source already present, nothing to do"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download the uploaded archive
+        if: steps.check.outputs.present == 'false'
+        run: |
+          curl -sSL -H 'Accept: application/octet-stream' -o /tmp/mcjs-generator.zip \
+            'https://filebin.net/mkca7k251vxl4y45/mcjs-generator.zip'
+          echo '4757530c2966e42e40d97cbaf9035dfdc03426e7c7c4db09b58275a6a01f2b12  /tmp/mcjs-generator.zip' | sha256sum -c -
+
+      - name: Recover the files
+        if: steps.check.outputs.present == 'false'
+        run: |
+          python3 - <<'PY'
+          import zipfile, zlib, os
+
+          PATH = '/tmp/mcjs-generator.zip'
+          z = zipfile.ZipFile(PATH)
+          data = open(PATH, 'rb').read()
+
+          ok = skipped = 0
+          for i in z.infolist():
+              if i.filename.endswith('.zip'):
+                  skipped += 1          # Mojang asset packs stay out of git
+                  continue
+              # The archive declares twice the real name length, so slice the
+              # payload at the true offset and prove it with the CRC.
+              start = i.header_offset + 30 + len(i.filename.encode())
+              raw = data[start:start + i.file_size]
+              if (zlib.crc32(raw) & 0xffffffff) != (i.CRC & 0xffffffff):
+                  raise SystemExit('CRC mismatch: ' + i.filename)
+              p = os.path.join('.', i.filename)
+              os.makedirs(os.path.dirname(p) or '.', exist_ok=True)
+              open(p, 'wb').write(raw)
+              ok += 1
+
+          print('recovered %d files, skipped %d asset packs' % (ok, skipped))
+          PY
+
+      - name: Commit and push
+        if: steps.check.outputs.present == 'false'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          echo "staged $(git diff --cached --name-only | wc -l) files"
+          if git diff --cached --quiet; then
+            echo 'nothing to commit'
+            exit 0
+          fi
+          git commit -m 'Add MinecraftJS v2.3.2 source (1.19.4 engine)'
+          git push origin HEAD:1.19.4
