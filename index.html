@@ -1,0 +1,584 @@
+<script type="text/x-server-plugin">
+// ===========================================================================
+//  MinecraftJS Realms: deterministic-seed co-op rooms.
+//
+//  The singleplayer terrain generator (src/mc1152/singleplayer.js genState) is
+//  a pure function of (x, y, z, seed, type), so every client derives identical
+//  terrain from the room's seed.  This server therefore never stores a voxel
+//  world: it holds the seed + type plus an append-only log of block edits,
+//  and relays block edits, player transforms and chat.  A joiner regenerates
+//  its own terrain, replays the log against it, and is in sync.
+//
+//  Durable layout inside `state` (zero-filled Uint8Array, use state.length):
+//    byte 0    u32  magic (0x524D314A, "RM1J")
+//    byte 4    u32  schema version (2)
+//    byte 8-15      reserved
+//    byte 16   32 room-directory entries of 20 bytes:
+//                +0  u32  FNV-1a hash of the room code
+//                +4  u32  world seed
+//                +8  u32  number of edit records
+//                +12 u8   world type (0 hills, 1 flat, 2 void, 3 voxel/Terralith,
+//                            4 oneblock/Skyblock shared island)
+//                +13 u8   used flag
+//                +14 u8   public flag (1 = listed in the public browser)
+//                +15 u8   mode (0 creative, 1 survival; oneblock rooms always survival)
+//                +16..19  reserved
+//    byte 656  room-code table: 32 slots of 24 bytes (NUL-padded ASCII).
+//    byte 1424 room arenas: 32 arenas of 196608 bytes.
+//               Record i = 12 bytes: x i32le, z i32le, y u16le, id u16le.
+//
+//  Client -> server RPC (string in, string|binary out):
+//    join  {room,name,seed?,type?,mode?,create?,pub?} -> {ok,sid,seed,type,mode,created,pub,members}
+//          (mode/pub only take effect when creating; otherwise the room keeps its flags)
+//    list  "" -> [{code,type,mode,players,builds}] public rooms, busiest first
+//    publish {pub} -> {ok,pub} (must be joined; toggles the public flag)
+//    sync  "" -> binary batch [11][count u32][records...]
+//    chat  {text} -> "ok" (relayed to room)
+//    leave "" -> "ok"
+//  Client -> server binary (must be joined):
+//    1 edit [1][x i32][z i32][y u16][id u16]
+//    2 move [2][x i32][y i32][z i32][yaw i16][pitch i16][nameLen u8][name...][skin u8?]
+//         (skin: 0 = steve, 1 = alex; absent = legacy client; forwarded as-is)
+//  Server -> client binary (room topic "rm"+slot):
+//    12 edit [12][sid u16][x i32][z i32][y u16][id u16]
+//    13 move [13][sid u16][x i32][y i32][z i32][yaw i16][pitch i16][nameLen][name][skin?]
+//    14 leave [14][sid u16]
+//  Server -> client text (room topic, or direct reply):
+//    {t:"join",sid,name} roster notice | {t:"leave",sid} (on clean leave)
+//    {t:"chat",sid,name,text} | {t:"error",msg} (direct only)
+//
+//  Everything here is public source: no secrets, trusts nothing a client
+//  sends.  Hot paths (edit/move) are binary and never touch JSON.
+// ===========================================================================
+
+var RM_MAGIC = 0x524D314A;
+var RM_VERSION = 2;
+var RM_ROOMS = 32;
+var RM_DIR = 16;
+var RM_ENTRY = 20;
+var RM_MAX_REC = 16384;
+var RM_REC = 12;
+var RM_DATA = RM_DIR + RM_ROOMS * RM_ENTRY; // 656
+// Room-code table for the public listing: 32 slots x 24 bytes (NUL-padded).
+var RM_CODETAB = RM_DATA;
+var RM_CODELEN = 24;
+var RM_ARENAS = RM_CODETAB + RM_ROOMS * RM_CODELEN; // 1424
+var RM_CAP = RM_MAX_REC * RM_REC;           // 196608
+
+var renv = new DataView(state.buffer, state.byteOffset, state.byteLength);
+
+if (renv.getUint32(0, true) !== RM_MAGIC || renv.getUint32(4, true) !== RM_VERSION) {
+  state.fill(0, 0, RM_DATA);
+  renv.setUint32(0, RM_MAGIC, true);
+  renv.setUint32(4, RM_VERSION, true);
+}
+
+// Ephemeral per-connection records.  Rebuilt from state + live sockets after
+// hibernation; clients rejoin (new sid, inline names self-heal the roster).
+var RM_CONNS = {};
+var RM_NEXT_SID = 1;
+
+function rmHash(s) {
+  var h = 2166136261;
+  for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function rmRoom(s) {
+  s = String(s == null ? "" : s).toLowerCase().replace(/[^a-z0-9-]/g, "");
+  if (s.length > 24) s = s.slice(0, 24);
+  return s;
+}
+function rmName(s) {
+  s = String(s == null ? "" : s).replace(/[\u0000-\u001f<>]/g, " ").trim();
+  if (s.length > 16) s = s.slice(0, 16);
+  return s || "Player";
+}
+function rmDirAt(slot) { return RM_DIR + slot * RM_ENTRY; }
+function rmBase(slot) { return RM_ARENAS + slot * RM_CAP; }
+function rmCount(slot) { return renv.getUint32(rmDirAt(slot) + 8, true); }
+function rmTopic(slot) { return "rm" + slot; }
+function rmCode(slot) {
+  var at = RM_CODETAB + slot * RM_CODELEN;
+  var s = "";
+  for (var i = 0; i < RM_CODELEN; i++) {
+    var c = state[at + i];
+    if (c === 0) break;
+    s += String.fromCharCode(c);
+  }
+  return s;
+}
+
+function rmFind(name) {
+  var h = rmHash(name);
+  for (var probe = 0; probe < RM_ROOMS; probe++) {
+    var slot = (h + probe) % RM_ROOMS;
+    var e = rmDirAt(slot);
+    if (renv.getUint8(e + 13) === 0) continue;
+    if (renv.getUint32(e, true) === h) return slot;
+  }
+  return -1;
+}
+
+function rmEvict() {
+  var best = -1, bestCount = Infinity;
+  for (var slot = 0; slot < RM_ROOMS; slot++) {
+    if (renv.getUint8(rmDirAt(slot) + 13) === 0) continue;
+    var live = 0;
+    for (var k in RM_CONNS) { if (RM_CONNS[k].slot === slot) { live = 1; break; } }
+    if (live) continue;
+    var c = rmCount(slot);
+    if (c < bestCount) { bestCount = c; best = slot; }
+  }
+  return best;
+}
+
+function rmCreate(name, seed, type, pub, mode) {
+  var h = rmHash(name);
+  var free = -1;
+  for (var probe = 0; probe < RM_ROOMS; probe++) {
+    var slot = (h + probe) % RM_ROOMS;
+    if (renv.getUint8(rmDirAt(slot) + 13) === 0) { free = slot; break; }
+  }
+  if (free < 0) free = rmEvict();
+  if (free < 0) return -1;
+  var e = rmDirAt(free);
+  if (seed == null || seed !== (seed >>> 0)) seed = (Math.random() * 4294967296) >>> 0;
+  renv.setUint32(e, h, true);
+  renv.setUint32(e + 4, seed >>> 0, true);
+  renv.setUint32(e + 8, 0, true);
+  renv.setUint8(e + 12, (type >= 0 && type <= 4) ? type : 0);
+  renv.setUint8(e + 13, 1);
+  renv.setUint8(e + 14, pub ? 1 : 0);
+  renv.setUint8(e + 15, mode ? 1 : 0);
+  var at = RM_CODETAB + free * RM_CODELEN;
+  for (var i = 0; i < RM_CODELEN; i++) {
+    state[at + i] = i < name.length ? name.charCodeAt(i) & 0x7F : 0;
+  }
+  return free;
+}
+
+function rmMembers(slot) {
+  var out = [];
+  for (var k in RM_CONNS) {
+    var c = RM_CONNS[k];
+    if (c.slot === slot) out.push([c.sid, c.name]);
+  }
+  return out;
+}
+
+function rmUniqueName(slot, want) {
+  var taken = {};
+  for (var k in RM_CONNS) { if (RM_CONNS[k].slot === slot) taken[RM_CONNS[k].name] = 1; }
+  if (!taken[want]) return want;
+  for (var i = 1; i < 100; i++) { if (!taken[want + i]) return want + i; }
+  return want;
+}
+
+// Token bucket: buckets hold `cap` units, refill `rate` per second.
+function rmAllow(c, key, cap, rate, now) {
+  var b = c[key];
+  if (!b) b = c[key] = { v: cap, t: now };
+  b.v = Math.min(cap, b.v + (now - b.t) * rate / 1000);
+  b.t = now;
+  if (b.v < 1) return false;
+  b.v -= 1;
+  return true;
+}
+
+function rmLeave(conn, quiet) {
+  var c = RM_CONNS[conn.id];
+  if (!c) return;
+  delete RM_CONNS[conn.id];
+  try { conn.unsubscribe(rmTopic(c.slot)); } catch (e) {}
+  if (!quiet) {
+    var out = new Uint8Array(3);
+    var dv = new DataView(out.buffer);
+    dv.setUint8(0, 14);
+    dv.setUint16(1, c.sid, true);
+    try { pubsub.publish(rmTopic(c.slot), out); } catch (e) {}
+  }
+}
+
+function rmGet(conn) { return RM_CONNS[conn.id] || null; }
+
+self.rpc = {
+  join: function (ctx, data) {
+    var conn = ctx.conn;
+    var now = Date.now();
+    var c = RM_CONNS[conn.id];
+    if (c && now - c.joinAt < 5000) throw new Error("joining too fast");
+    var info;
+    try { info = JSON.parse(String(data)); } catch (e) { throw new Error("bad join"); }
+    var room = rmRoom(info.room);
+    if (!room) throw new Error("bad room code (a-z, 0-9, -, max 24)");
+    var name = rmName(info.name);
+    var slot = rmFind(room);
+    var created = false;
+    if (slot < 0) {
+      if (!info.create) throw new Error("room not found — check the code or create it");
+      slot = rmCreate(room, info.seed, info.type, info.pub, info.mode);
+      if (slot < 0) throw new Error("all rooms busy, try again later");
+      created = true;
+    } else if (info.create) {
+      throw new Error("room already exists — use join");
+    }
+    if (c) rmLeave(conn, true);
+    var sid = RM_NEXT_SID;
+    RM_NEXT_SID = (RM_NEXT_SID + 1) & 0xFFFF;
+    if (RM_NEXT_SID === 0) RM_NEXT_SID = 1;
+    name = rmUniqueName(slot, name);
+    RM_CONNS[conn.id] = { slot: slot, sid: sid, name: name, joinAt: now };
+    try { conn.subscribe(rmTopic(slot)); } catch (e) { throw new Error("subscribe failed"); }
+    var e = rmDirAt(slot);
+    var members = rmMembers(slot);
+    try {
+      pubsub.publish(rmTopic(slot), JSON.stringify({ t: "join", sid: sid, name: name }));
+    } catch (err) {}
+    return JSON.stringify({
+      ok: 1, sid: sid, seed: renv.getUint32(e + 4, true),
+      type: renv.getUint8(e + 12), mode: renv.getUint8(e + 15) ? 1 : 0,
+      created: created ? 1 : 0,
+      pub: renv.getUint8(e + 14) ? 1 : 0, members: members
+    });
+  },
+
+  list: function () {
+    var out = [];
+    for (var slot = 0; slot < RM_ROOMS; slot++) {
+      var e = rmDirAt(slot);
+      if (renv.getUint8(e + 13) === 0) continue;
+      if (renv.getUint8(e + 14) === 0) continue;
+      var live = 0;
+      for (var k in RM_CONNS) { if (RM_CONNS[k].slot === slot) live++; }
+      out.push({
+        code: rmCode(slot), type: renv.getUint8(e + 12),
+        mode: renv.getUint8(e + 15) ? 1 : 0,
+        players: live, builds: rmCount(slot)
+      });
+    }
+    out.sort(function (a, b) { return (b.players - a.players) || (b.builds - a.builds); });
+    return JSON.stringify(out.slice(0, RM_ROOMS));
+  },
+
+  publish: function (ctx, data) {
+    var c = rmGet(ctx.conn);
+    if (!c) throw new Error("not in a room");
+    var on = true;
+    try { on = !!JSON.parse(String(data)).pub; } catch (e) {}
+    renv.setUint8(rmDirAt(c.slot) + 14, on ? 1 : 0);
+    return JSON.stringify({ ok: 1, pub: on ? 1 : 0 });
+  },
+
+  sync: function (ctx) {
+    var conn = ctx.conn;
+    var c = rmGet(conn);
+    if (!c) throw new Error("not in a room");
+    var count = rmCount(c.slot);
+    var out = new Uint8Array(5 + count * RM_REC);
+    var dv = new DataView(out.buffer);
+    dv.setUint8(0, 11);
+    dv.setUint32(1, count, true);
+    var base = rmBase(c.slot);
+    for (var i = 0; i < count; i++) {
+      var s = base + i * RM_REC;
+      out[5 + i * RM_REC] = state[s];
+      out[5 + i * RM_REC + 1] = state[s + 1];
+      out[5 + i * RM_REC + 2] = state[s + 2];
+      out[5 + i * RM_REC + 3] = state[s + 3];
+      out[5 + i * RM_REC + 4] = state[s + 4];
+      out[5 + i * RM_REC + 5] = state[s + 5];
+      out[5 + i * RM_REC + 6] = state[s + 6];
+      out[5 + i * RM_REC + 7] = state[s + 7];
+      out[5 + i * RM_REC + 8] = state[s + 8];
+      out[5 + i * RM_REC + 9] = state[s + 9];
+      out[5 + i * RM_REC + 10] = state[s + 10];
+      out[5 + i * RM_REC + 11] = state[s + 11];
+    }
+    return out;
+  },
+
+  chat: function (ctx, data) {
+    var conn = ctx.conn;
+    var c = rmGet(conn);
+    if (!c) throw new Error("not in a room");
+    var now = Date.now();
+    if (c.chatAt && now - c.chatAt < 1500) throw new Error("chatting too fast");
+    var text;
+    try { text = String(JSON.parse(String(data)).text || ""); } catch (e) { throw new Error("bad chat"); }
+    text = text.replace(/[\u0000-\u001f]/g, "").trim();
+    if (!text) throw new Error("empty");
+    if (text.length > 200) text = text.slice(0, 200);
+    c.chatAt = now;
+    try {
+      pubsub.publish(rmTopic(c.slot), JSON.stringify({ t: "chat", sid: c.sid, name: c.name, text: text }));
+    } catch (e) { throw new Error("publish failed"); }
+    return "ok";
+  },
+
+  leave: function (ctx) {
+    rmLeave(ctx.conn, false);
+    return "ok";
+  }
+};
+
+self.onmessage = function (ev) {
+  var conn = ev.conn;
+  var data = ev.data;
+  if (typeof data === "string") return; // text goes through rpc only
+  var c = rmGet(conn);
+  if (!c) return;
+  var u8 = new Uint8Array(data);
+  if (u8.length < 1) return;
+  var tag = u8[0];
+  var now = Date.now();
+  if (tag === 1) {
+    // edit [1][x i32][z i32][y u16][id u16]
+    if (u8.length !== 13) return;
+    if (!rmAllow(c, "eb", 30, 30, now)) return;
+    var dv = new DataView(data);
+    var y = dv.getUint16(9, true);
+    if (y > 319) return; // 1.18 build ceiling (u16 wire; y < 0 stays local-only)
+    var count = rmCount(c.slot);
+    if (count >= RM_MAX_REC) {
+      try { conn.send(JSON.stringify({ t: "error", msg: "room build log is full" })); } catch (e) {}
+      return;
+    }
+    var s = rmBase(c.slot) + count * RM_REC;
+    state[s] = u8[1]; state[s + 1] = u8[2]; state[s + 2] = u8[3]; state[s + 3] = u8[4];
+    state[s + 4] = u8[5]; state[s + 5] = u8[6]; state[s + 6] = u8[7]; state[s + 7] = u8[8];
+    state[s + 8] = u8[9]; state[s + 9] = u8[10]; state[s + 10] = u8[11]; state[s + 11] = u8[12];
+    renv.setUint32(rmDirAt(c.slot) + 8, count + 1, true);
+    var out = new Uint8Array(15);
+    var od = new DataView(out.buffer);
+    od.setUint8(0, 12);
+    od.setUint16(1, c.sid, true);
+    for (var i = 0; i < 12; i++) out[3 + i] = u8[1 + i];
+    try { pubsub.publish(rmTopic(c.slot), out); } catch (e) {}
+  } else if (tag === 2) {
+    // move [2][x i32][y i32][z i32][yaw i16][pitch i16][nameLen u8][name...][skin u8?]
+    if (u8.length < 18 || u8.length > 67) return;
+    var mnl = u8[17];
+    if (mnl > 48) return;
+    if (u8.length !== 18 + mnl && u8.length !== 19 + mnl) return;
+    if (u8.length === 19 + mnl && u8[18 + mnl] > 1) return;
+    if (!rmAllow(c, "mb", 20, 12, now)) return;
+    var fwd = new Uint8Array(3 + u8.length - 1);
+    fwd[0] = 13;
+    fwd[1] = c.sid & 0xFF;
+    fwd[2] = (c.sid >> 8) & 0xFF;
+    for (var j = 1; j < u8.length; j++) fwd[2 + j] = u8[j];
+    try { pubsub.publish(rmTopic(c.slot), fwd); } catch (e) {}
+  }
+};
+
+self.onclose = function (ev) { rmLeave(ev.conn, false); };
+
+// ===========================================================================
+//  MCJS Voice: proximity voice-chat signaling for EXTERNAL multiplayer
+//  servers (singleplayer / realm mirrors never enter these rooms).
+//
+//  Stateless relay: no `state` use at all, ephemeral maps + pub/sub topics
+//  only, so it cannot disturb the Realms data above.  Audio itself is
+//  WebRTC peer-to-peer between browsers (Opus); the server only introduces
+//  peers (roster) and forwards the small SDP/ICE signaling envelopes.
+//
+//  Client -> server RPC:
+//    voiceJoin {room,name,uuid} -> {ok,sid,name,members:[[sid,name,uuid]]}
+//    voiceLeave "" -> "ok"
+//  Server -> room topic "vc:"+room (text): {t:"vjoin",sid,name,uuid} |
+//    {t:"vleave",sid}
+//  Client -> server text (signaling, must be in a room):
+//    {t:"vsig",to,kind,data} (kind: offer|answer|ice, data <= 8192 chars)
+//  Server -> client text (direct send): {t:"vsig",from,kind,data}
+// ===========================================================================
+
+var VC_CONNS = {};
+var VC_SID_TO_CONN = {};
+var VC_NEXT_SID = 1;
+var VC_MAX_ROOM = 16;
+
+function vcRoom(s) {
+  s = String(s == null ? "" : s).toLowerCase();
+  var o = "";
+  for (var i = 0; i < s.length && o.length < 64; i++) {
+    var c = s.charCodeAt(i);
+    var ok = (c >= 97 && c <= 122) || (c >= 48 && c <= 57) || c === 46 || c === 58 || c === 45;
+    if (ok) o += s.charAt(i);
+  }
+  return o;
+}
+function vcName(s) {
+  s = String(s == null ? "" : s);
+  var o = "";
+  for (var i = 0; i < s.length && o.length < 16; i++) {
+    var c = s.charCodeAt(i);
+    o += (c < 32 || c === 60 || c === 62) ? " " : s.charAt(i);
+  }
+  o = o.trim();
+  return o || "Player";
+}
+function vcUuid(s) {
+  s = String(s == null ? "" : s).toLowerCase();
+  var o = "";
+  for (var i = 0; i < s.length && o.length < 36; i++) {
+    var c = s.charCodeAt(i);
+    var ok = (c >= 48 && c <= 57) || (c >= 97 && c <= 102) || c === 45;
+    if (ok) o += s.charAt(i);
+  }
+  return o;
+}
+function vcTopic(room) { return "vc:" + room; }
+function vcAllow(store, key, cap, rate, now) {
+  var b = store[key];
+  if (!b) b = store[key] = { v: cap, t: now };
+  b.v = Math.min(cap, b.v + (now - b.t) * rate / 1000);
+  b.t = now;
+  if (b.v < 1) return false;
+  b.v -= 1;
+  return true;
+}
+function vcUniqueName(room, want) {
+  var taken = {};
+  for (var k in VC_CONNS) { if (VC_CONNS[k].room === room) taken[VC_CONNS[k].name] = 1; }
+  if (!taken[want]) return want;
+  for (var i = 1; i < 100; i++) { if (!taken[want + i]) return want + i; }
+  return want;
+}
+function vcLeave(conn, quiet) {
+  var c = VC_CONNS[conn.id];
+  if (!c) return;
+  delete VC_CONNS[conn.id];
+  if (VC_SID_TO_CONN[c.sid] === conn) delete VC_SID_TO_CONN[c.sid];
+  try { conn.unsubscribe(vcTopic(c.room)); } catch (e) {}
+  if (!quiet) {
+    try { pubsub.publish(vcTopic(c.room), JSON.stringify({ t: "vleave", sid: c.sid })); } catch (e) {}
+  }
+}
+
+self.rpc.voiceJoin = function (ctx, data) {
+  var conn = ctx.conn;
+  var now = Date.now();
+  var c = VC_CONNS[conn.id];
+  if (c && now - c.joinAt < 5000) throw new Error("joining too fast");
+  var info;
+  try { info = JSON.parse(String(data)); } catch (e) { throw new Error("bad join"); }
+  var room = vcRoom(info.room);
+  if (!room) throw new Error("bad room");
+  var name = vcUniqueName(room, vcName(info.name));
+  var uuid = vcUuid(info.uuid);
+  var members = [];
+  for (var k in VC_CONNS) {
+    if (VC_CONNS[k].room === room) members.push([VC_CONNS[k].sid, VC_CONNS[k].name, VC_CONNS[k].uuid]);
+  }
+  if (members.length >= VC_MAX_ROOM) throw new Error("voice room is full");
+  if (c) vcLeave(conn, true);
+  var sid = VC_NEXT_SID;
+  VC_NEXT_SID = (VC_NEXT_SID + 1) & 0xFFFFFF;
+  if (VC_NEXT_SID === 0) VC_NEXT_SID = 1;
+  while (VC_SID_TO_CONN[sid]) {
+    sid = VC_NEXT_SID;
+    VC_NEXT_SID = (VC_NEXT_SID + 1) & 0xFFFFFF;
+    if (VC_NEXT_SID === 0) VC_NEXT_SID = 1;
+  }
+  VC_CONNS[conn.id] = { room: room, sid: sid, name: name, uuid: uuid, joinAt: now, bk: {} };
+  VC_SID_TO_CONN[sid] = conn;
+  try { conn.subscribe(vcTopic(room)); } catch (e) {
+    vcLeave(conn, true);
+    throw new Error("subscribe failed");
+  }
+  try {
+    pubsub.publish(vcTopic(room), JSON.stringify({ t: "vjoin", sid: sid, name: name, uuid: uuid }));
+  } catch (e) {}
+  return JSON.stringify({ ok: 1, sid: sid, name: name, members: members });
+};
+
+self.rpc.voiceLeave = function (ctx) {
+  vcLeave(ctx.conn, false);
+  return "ok";
+};
+
+var __rmOnMessage = self.onmessage;
+self.onmessage = function (ev) {
+  try {
+    if (typeof ev.data === "string") {
+      var c = VC_CONNS[ev.conn.id];
+      if (c) {
+        var msg = null;
+        try { msg = JSON.parse(ev.data); } catch (e) {}
+        if (msg && msg.t === "vsig") {
+          var now = Date.now();
+          if (vcAllow(c.bk, "s", 40, 20, now)) {
+            var to = msg.to | 0;
+            var kind = String(msg.kind || "");
+            var payload = String(msg.data == null ? "" : msg.data);
+            if ((kind === "offer" || kind === "answer" || kind === "ice") && payload.length <= 8192) {
+              var tc = VC_SID_TO_CONN[to];
+              if (tc && VC_CONNS[tc.id] && VC_CONNS[tc.id].room === c.room) {
+                try { tc.send(JSON.stringify({ t: "vsig", from: c.sid, kind: kind, data: payload })); } catch (e) {}
+              }
+            }
+          }
+          return;
+        }
+      }
+    }
+  } catch (e) {}
+  try { __rmOnMessage(ev); } catch (e) {}
+};
+
+var __rmOnClose = self.onclose;
+self.onclose = function (ev) {
+  try { vcLeave(ev.conn, false); } catch (e) {}
+  try { __rmOnClose(ev); } catch (e) {}
+};
+</script>
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+canvas {
+  position: fixed;
+  left: 0;
+  top: 0;
+  display: block;
+  image-rendering: pixelated;
+}
+
+#game-canvas { z-index: 0; outline: none; }
+
+/* Shown only until the graphics device draws the Mojang splash, and for startup errors */
+#loading {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+  color: #000;
+}
+
+#loading .loading-box { display: none; width: min(560px, 85vw); text-align: center; }
+#loading.error { background: #1e1e1e; color: #fff; }
+#loading.error .loading-box { display: block; }
+.loading-title { font-size: 28px; font-weight: bold; margin-bottom: 16px; }
+.loading-track { display: none; }
+#loading-text { font-size: 14px; color: #ff6b6b; white-space: pre-wrap; }
+</style>
+  <div id="loading">
+    <div class="loading-box">
+      <div class="loading-title">MinecraftJS</div>
+      <div class="loading-track"><div id="loading-bar"></div></div>
+      <div id="loading-text">Starting...</div>
+    </div>
+  </div>
+<script type="module" src="src/boot.js"></script>

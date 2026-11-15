@@ -1,0 +1,7 @@
+$meta
+  title = MinecraftJS
+  description = MinecraftJS 1.19.4 (v2.3.2) - browser voxel game: 762 multiplayer client (live server list) with singleplayer survival, dragon endgame (fight, gateways, elytra, chorus, cities/shulkers), Tectonic worldgen + caves/geodes, ocean monuments + tridents/conduit, multi-biome Nether with fortresses, mansions + explorer maps, illagers/raids/trader, and 1.19 content (frogs/tadpoles, allay, camel, sniffer, warden + shriekers, sculk, mud, cherry groves, chest boats, recovery compass, goat horns, torchflowers). Title-screen Download saves the full game as one offline file (Full or phone-sized Lite); voice works over mesh in the file.
+
+createServerSocket = {import:server-plugin}
+  header
+    mode = minimal
