@@ -1,0 +1,43 @@
+# --- dependencies / build output ---
+node_modules/
+dist/
+dist-*/
+
+# --- Mojang assets (built locally from a client.jar, never committed) ---
+# Same policy as upstream: assets stay out of git and are assembled on the
+# machine that runs the game.
+src/mc1194/assets-1194.zip
+src/mc1194/assets-1194-sounds.zip
+src/mc1194/assets-1194-legacy-sounds.zip
+client/assets/
+assets-1194*.zip
+
+# --- client jars and extracted version dirs ---
+*.jar
+client.jar
+1.8.9/
+1.12.2/
+1.13.2/
+1.14.4/
+1.15.2/
+1.16.5/
+1.17.1/
+1.18.2/
+1.19.4/
+1.20.6/
+1.*-wip/
+cache/
+server/
+
+# --- local scratch: built files, logs, editor noise ---
+*.log
+.DS_Store
+Thumbs.db
+*.claudechats.json
+minecraftjs.*.html
+mcjs-generator.zip
+scratch/
+
+# --- local config ---
+client/config.json
+config.json
